@@ -1,8 +1,11 @@
 package com.ghanshyam.tailtrail
 
 import android.icu.text.ListFormatter.Width
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,76 +19,131 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import com.ghanshyam.tailtrail.ui.theme.Citrine
 import com.ghanshyam.tailtrail.ui.theme.Custard
 import com.ghanshyam.tailtrail.ui.theme.RoyalBlue
 
 @Composable
 fun SnakeGameScreen(
-    state: SnakeGameState
+    state: SnakeGameState,
+    onEvent: (SnakeGameEvent) -> Unit
 ) {
     val foodImage = ImageBitmap.imageResource(id = R.drawable.food)
-    Column(
+    val snakeHeadImage = when (state.direction) {
+        Direction.UP -> ImageBitmap.imageResource(id = R.drawable.up)
+        Direction.DOWN -> ImageBitmap.imageResource(id = R.drawable.down)
+        Direction.LEFT -> ImageBitmap.imageResource(id = R.drawable.left)
+        Direction.RIGHT -> ImageBitmap.imageResource(id = R.drawable.right)
+    }
+
+    Box(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.SpaceAround
+        contentAlignment = Alignment.Center
     ) {
-        Card(
-            modifier = Modifier
-                .padding(8.dp)
-                .fillMaxWidth()
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceAround
         ) {
+            Card(
+                modifier = Modifier
+                    .padding(8.dp)
+                    .fillMaxWidth()
+            ) {
+                Text(
+                    modifier = Modifier.padding(16.dp),
+                    text = "Score: ${state.snake.size - 1}",
+                    style = MaterialTheme.typography.headlineMedium
+                )
+            }
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(ratio = 2 / 3f)
+                    .pointerInput(state.gameState) {
+                        if (state.gameState != GameState.STARTED) {
+                            return@pointerInput
+                        }
+                        detectTapGestures { offset ->
+                            onEvent(SnakeGameEvent.UpdateDirection(offset, size.width))
+                        }
+                    }
+            ) {
+                val cellSize = size.width / 20
+                drawGameBoard(
+                    cellSize = cellSize,
+                    cellColor = Custard,
+                    borderCellColor = RoyalBlue,
+                    gridWidth = state.xAxisGridSize,
+                    gridHeight = state.yAxisGridSize
+                )
+                drawFood(
+                    foodImage = foodImage,
+                    cellSize = cellSize.toInt(),
+                    coordinate = state.food
+                )
+                drawSnake(
+                    snakeHeadImage = snakeHeadImage,
+                    cellSize = cellSize,
+                    snake = state.snake
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .padding(8.dp)
+                    .fillMaxWidth()
+            ) {
+                Button(
+                    modifier = Modifier.weight(1f),
+                    onClick = { onEvent(SnakeGameEvent.ResetGame) },
+                    enabled = state.gameState == GameState.PAUSED || state.isGameOver
+                ) {
+                    Text(text = if (state.isGameOver) "Reset" else "New Game")
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Button(
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        when (state.gameState) {
+                            GameState.IDLE, GameState.PAUSED -> onEvent(SnakeGameEvent.StartGame)
+                            GameState.STARTED -> onEvent(SnakeGameEvent.PauseGame)
+                        }
+                    },
+                    enabled = !state.isGameOver
+                ) {
+                    Text(
+                        text = when (state.gameState) {
+                            GameState.IDLE -> "Start"
+                            GameState.STARTED -> "Pause"
+                            GameState.PAUSED -> "Resume"
+                        }
+                    )
+                }
+            }
+        }
+        AnimatedVisibility(visible = state.isGameOver) {
+
             Text(
                 modifier = Modifier.padding(16.dp),
-                text = "Score: ${state.snake.size - 1}",
-                style = MaterialTheme.typography.headlineMedium
+                text = "Game Over",
+                style = MaterialTheme.typography.displayMedium
             )
-        }
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(ratio = 2 / 3f)
-        ) {
-            val cellSize = size.width / 20
-            drawGameBoard(
-                cellSize = cellSize,
-                cellColor = Custard,
-                borderCellColor = RoyalBlue,
-                gridWidth = state.xAxisGridSize,
-                gridHeight = state.yAxisGridSize
-            )
-            drawFood(
-                foodImage = foodImage,
-                cellSize = cellSize.toInt(),
-                coordinate = state.food
-            )
-        }
-        Row(
-            modifier = Modifier
-                .padding(8.dp)
-                .fillMaxWidth()
-        ) {
-            Button(
-                modifier = Modifier.weight(1f),
-                onClick = { /*TODO*/ }) {
-                Text(text = "Replay")
-            }
-            Spacer(modifier = Modifier.width(10.dp))
-            Button(
-                modifier = Modifier.weight(1f),
-                onClick = { /*TODO*/ }) {
-                Text(text = "Start")
-            }
+
         }
     }
+
+
 }
 
 private fun DrawScope.drawGameBoard(
@@ -122,4 +180,35 @@ private fun DrawScope.drawFood(
         ),
         dstSize = IntSize(cellSize, cellSize)
     )
+}
+
+
+private fun DrawScope.drawSnake(
+    snakeHeadImage: ImageBitmap,
+    cellSize: Float,
+    snake: List<coordinate>
+) {
+    val cellSizeInt = cellSize.toInt()
+    snake.forEachIndexed { index, coordinate ->
+        val radius = if (index == snake.lastIndex) cellSize / 2.5f else cellSize / 2
+        if (index == 0) {
+            drawImage(
+                image = snakeHeadImage,
+                dstOffset = IntOffset(
+                    x = (coordinate.x * cellSizeInt),
+                    y = (coordinate.y * cellSizeInt)
+                ),
+                dstSize = IntSize(cellSizeInt, cellSizeInt)
+            )
+        } else {
+            drawCircle(
+                color = Citrine,
+                center = Offset(
+                    x = (coordinate.x * cellSize) + radius,
+                    y = (coordinate.y * cellSize) + radius
+                ),
+                radius = radius
+            )
+        }
+    }
 }
