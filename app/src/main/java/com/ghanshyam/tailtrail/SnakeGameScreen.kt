@@ -1,6 +1,7 @@
 package com.ghanshyam.tailtrail
 
 import android.icu.text.ListFormatter.Width
+import android.media.MediaPlayer
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -19,6 +20,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -27,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -48,6 +52,24 @@ fun SnakeGameScreen(
         Direction.RIGHT -> ImageBitmap.imageResource(id = R.drawable.right)
     }
 
+    val context = LocalContext.current
+    val foodSound = remember {
+        MediaPlayer.create(context, R.raw.bite)
+    }
+    val gameOverSound = remember {
+        MediaPlayer.create(context, R.raw.over)
+    }
+
+    LaunchedEffect(key1 = state.snake.size) {
+        if (state.snake.size != 1) {
+            foodSound?.start()
+        }
+    }
+    LaunchedEffect(key1 = state.isGameOver) {
+        if (state.isGameOver) {
+            gameOverSound?.start()
+        }
+    }
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
